@@ -1,0 +1,259 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[colorlinks=true, urlcolor=black, linkcolor=black, citecolor=black]{hyperref}
+
+
+\definecolor{mygray}{rgb}{0.6,0.6,0.6}
+
+% Define C Code Style
+\lstdefinestyle{CStyle}{
+    language=C,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue},
+    commentstyle=\color{mygray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    breaklines=true,
+    frame=single
+}
+
+\title{Project Report  \\ \large Systems Programming – Spring 2025}
+\author{Barış Çakmak, 2022400000 \\ Tuğçe Yücel, 2022400105
+%\\ Department of Computer Engineering \\ University Name
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+% \begin{abstract}
+% This document presents the project details for the C programming assignment. It includes problem definition, methodology, implementation details, results, and conclusions.
+% \end{abstract}
+
+\section{Introduction}
+This project implements an interpreter and an inventory tracking system for Geralt.The system allows Geralt to manage ingredients, potions, trophies, and information about monsters. Main goal is executing given input line by line and calling necessary functions after validating every line.
+
+\section{Problem Description}
+The task is to create an interpreter that interprets the given input line by line and completes the following task correctly.
+\begin{itemize}
+    \item For each line, parse the input and detect any grammar mistakes that violate grammar rules
+    \item Then, call corresponding methods for a given specific input
+    \item Update the corresponding data structures if the method that is called requires to do so
+    \item Lastly, for each line, give an output representing the response to the given input line
+\end{itemize}
+
+\section{Methodology}
+Our project includes various data structures such as hashmap, linked list and further specially designed data structures. Even if hashmap and linked list is not necessary considering the size of possible inputs, we thought It was better to use hashmaps for good coding practice. Hashmaps and linked lists were used in following areas.
+\begin{itemize}
+    \item Storing ingredients, trophies, potions, monsters in a hashmap and each entry in the hashmap is a linked list to resolve collisions
+\end{itemize}
+To acquire a solid and dynamic structure, we used generic hashmaps that are created inside heap. With this improvement, our code will also work in very large inputs in seconds and can be reutilized for different data types since it is generic.
+
+\section{Implementation}
+To begin with, given the input line, we will tokenize each line by white spaces. Doing so, our job will be easier when handling inputs with so many white spaces. After each word is tokenized, execute\_line() method is called for checking whether the input is gramatically correct or not.\newline
+After the correctness of the input is guaranteed, we can now safely send the information to the method we want to call.
+
+\subsection{Code Structure}
+\subsubsection{Modules}
+\begin{itemize}
+  \item \texttt{main.c}: Handles input reading, command tokenization, grammar checking.
+  \item \texttt{actions.c}: Implements core logic for loot, trade, brew, learn, and encounter actions.
+  \item \texttt{queries.c}: Handles queries related to ingredients, potions, trophies, and bestiary.
+  \item \texttt{hashmap.c}: Implements a hashmap using separate chaining with dynamic resizing.
+  \item \texttt{helper\_methods.c}: Includes helper functions for parsing, validation, and sorting.
+  \item \texttt{structures.c}: Defines custom data structures like \texttt{Pair}, \texttt{Potion}, \texttt{Bestiary} and \texttt{PairArray}.
+\end{itemize}
+\subsubsection{Functions}
+\begin{itemize}
+  \item \texttt{execute\_line}: Parses and validates user input, then sends necessary data to corresponding function.
+  \item \texttt{checkPairs}: Validates input syntax for ingredients and trophy pairs, ensuring grammar correctness.
+  \item \texttt{constructPairArray}: Converts valid token sequences into arrays of \texttt{Pair} objects.
+  \item \texttt{isNameValid}: Ensures a string contains only alphabetic characters and single spaces between words.
+  \item \texttt{extractPotionName}: Extracts potion names by removing trailing characters from command strings.
+  \item \texttt{createArrayOfKeys}: Extracts all keys from a hashmap into an array of strings.
+  \item \texttt{loot}: Updates Geralt's ingredient inventory with newly looted items.
+  \item \texttt{trade}: Trades trophies for ingredients only if all required trophies are available.
+  \item \texttt{brew}: Creates a potion if Geralt knows the formula and has the necessary ingredients.
+  \item \texttt{learnPotionRecipe}: Adds a new potion formula to the potion hashmap.
+  \item \texttt{learnSign}: Records effective signs for known or new monsters in the bestiary
+  \item \texttt{learnPotion}: Records effective potions for known or new monsters in the bestiary.
+  \item \texttt{encounter}: Geralt fights with the monster and the result is determined based on known effectiveness.
+  \item \texttt{specificIngredients}, \texttt{specificPotion}, \texttt{specificTrophies}: Look up to corresponding hashmap and retrieve the amount of the item.
+  \item \texttt{allIngredients}, \texttt{allPotions}, \texttt{allTrophies}: Print sorted summaries of current inventory contents.
+  \item \texttt{potionFormula}: Outputs the recipe of a known potion, sorted by amount, then by name.
+  \item \texttt{potionSignEffectiveness}: Prints all known effective signs and potions against a given monster.
+\end{itemize}
+\subsection{Sample Code}
+Below, a descriptive function is provided for every module of the project.\newline\newline
+\texttt{actions.c:}
+\begin{lstlisting}[style=CStyle]
+void learnPotionRecipe(HashMap *potions, char *potion, PairArray *ingredients){
+
+    if (contains(potions, potion)){ // If formula is already known
+        printf("Already known formula\n");
+        return;
+    }
+
+    Potion *potionWithRecipe = malloc(sizeof(Potion)); // Allocate memory for the potion
+    potionWithRecipe->recipe = ingredients; // Set the recipe
+    potionWithRecipe->potionCount = 0;
+
+    insert(potions, potion, potionWithRecipe, sizeof(Potion)); // Insert the potion to the potions Hashmap
+    printf("New alchemy formula obtained: %s\n" , potion);
+}
+\end{lstlisting}
+\texttt{hashmap.c:}
+\begin{lstlisting}[style=CStyle]
+int contains(HashMap *map, const char* key){
+
+    int index = hash(map, key); // Find the possible index of the key
+
+    HashNode *currentNode = map->table[index]; // Get the head of the linked list
+
+    // Traverse the linked list
+    while (currentNode){
+        if (strcmp(currentNode->key, key) == 0)
+            return 1;
+        currentNode = currentNode->next;
+    }
+
+    return 0;
+}
+\end{lstlisting}
+\texttt{queries.c:}
+\begin{lstlisting}[style=CStyle]
+void specificPotion(HashMap *potions, char *potion){
+    if(contains(potions, potion)){  // Checks if potion is available
+        Potion *p = (Potion *)get(potions, potion);
+        printf("%d\n", p->potionCount);
+        return;
+    }
+    else{  // If it is not in the potions list
+        printf("0\n");
+    }
+}
+\end{lstlisting}
+\texttt{helper\_methods.c}
+\begin{lstlisting}[style=CStyle]
+void extractPotionName(char *potionStart, char *firstWord){
+    char *temp = potionStart; // Potion start address
+    char *firstWhiteSpace; // First white space after potion name, initially uninitialized
+
+    // Loop until we reach first word after potion name
+    while (temp != firstWord){
+        if (*temp == ' '){ // If we reach a white space, save it and skip adjacent white spaces
+            firstWhiteSpace = temp;
+            temp++;
+            while (*temp == ' '){
+                temp++;
+            }
+        }else{
+            temp++;
+        }
+    }
+
+    // Here firstWhiteSpace is pointing to the first white space after potion name
+    *firstWhiteSpace = '\0';
+}
+\end{lstlisting}
+\texttt{structures.c}
+\begin{lstlisting}[style=CStyle]
+void resizeArray(PairArray *pairArray){
+    int newSize = pairArray->capacity*2;
+    Pair **newArray = realloc(pairArray->array, newSize*sizeof(Pair*));
+
+    if (newArray == NULL){
+        printf("Memory reallocation failed!");
+        exit(1);
+    }
+    pairArray->capacity = newSize;
+    pairArray->array = newArray;
+}
+\end{lstlisting}
+
+
+\section{Results}
+
+
+\subsection{Invalid}
+\begin{verbatim}
+>> Geralt loot 3 Rebis, 2 Aether
+INVALID
+Explanation: "loot" instead of "loots"
+
+>> Geralt learns baris  tugce potion consists of 3 Rebis, 1 Aether
+INVALID
+Explanation: More than one spaces in a potion name
+
+>> Geralt brews baris  tugce potion
+INVALID
+Explanation: After potion name nothing should come and potion name is again wrong
+
+>> Geralt loots -3 Rebis, 0 Coconuts
+INVALID
+Explanation: Non-positive integers are not allowed for quantity
+
+>> what is in baris  tugce ?
+INVALID
+Explanation: w should be capital and potion name is wrong
+
+>> Geralt brews a baris  tugce
+INVALID
+Explanation: After brews just the name of the potion must come
+\end{verbatim}
+
+\subsection{Valid}
+\begin{verbatim}
+>> Geralt loots 3 Rebis   ,  2 Aether
+Alchemy ingredients obtained.
+
+>> Geralt learns  baris tugce    potion   consists of 3 Rebis, 1 Aether
+New alchemy formula obtained: baris tugce
+
+>> Geralt brews baris tugce
+Alchemy item created: baris tugce
+
+>> Total ingredient ?
+2 Aether
+
+>> What is in baris tugce ?
+3 Rebis, 1 Aether
+
+>> Geralt brews baris tugce
+Not enough ingredients
+\end{verbatim}
+
+\section{Discussion}
+
+Our hashmap is very well designed and functions properly, but linked list chaining in hashmaps may sometimes be a problem when inputs are specifically given to hash to same location. In the worst case, if every element is hashed to the same index, the hashmap will not perform operations in O(1) but instead O(n), where n is the number of elements in the hashmap.\newline\newline
+Other than that, since we assumed there will not be vast inputs, malloc and realloc checks were not made strictly. Hence, if a massive input is given to program and hashmap becomes so large, when it tries to rehash it may not succeed. If this project is going to be improved for a larger scale, this point should be considered.\newline\newline
+We are all humans and we can always make mistakes. Therefore, even if a programmer thinks that there are no memory leaks in his program, he should consider adding a memory leak detection to the program to ensure validity and facilitate debugging.\newline\newline
+This project is just made for the given pdf description and may not be appropriate for other usages of interpretation and grammar checks even if it seems like it would work. Adjustments advised are listed below
+
+\begin{itemize}
+  \item Design a more robust hashmap implementation with different collision resolution methods
+  \item Ensure memory safety with a memory leak detector
+  \item Consider other cases from the ones in the provided code as well to obtain a generalized version of the code
+\end{itemize}
+
+
+\section{Conclusion}
+
+This project demonstrated modular C design, dynamic memory management, and interactive input handling. By accurately reflecting Geralt's adventures through commands, we created a robust and extensible command interpreter.
+
+%\section{References}
+
+\bibliographystyle{plain}  % Bibliography style
+\bibliography{references}
+\begin{itemize}
+    \item ChatGPT --- While designing the hashmap and which methods to use in hashmap, GPT helped us a lot at understanding how a double pointer works and how to free it without any errors. Besides this, we had minor errors in our code at some places and GPT assisted us to resolve those. Lastly, to check if our code works, We asked for GPT to generate us an input file and we took it as a grader for out project.
+    \item Gökçe Uludoğan --- Examined the GitHub repo provided in pdf and it helped us to create the structure of this documentation.\newline\newline
+    Link: \url{https://github.com/bouncmpe230/project-report-template}
+\end{itemize}
+\end{document}
